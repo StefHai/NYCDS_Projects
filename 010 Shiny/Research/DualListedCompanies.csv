@@ -1,0 +1,11 @@
+company,us_stock_exchange,in_stock_exchange,sector,us_symbol,in_symbol,comment
+ICICI Bank,NYSE,BSE,Banks,IBN,ICICIBANK,
+Infosys,NYSE,BSE,Software & Computer Services,INFY,INFY,
+MakeMyTrip Limited,NASDAQ,?,Travel & Leisure,MMYT,?,not found in BSE
+Rediff.com India,NASDAQ,?,Newspaper and Magazine,REDFY,?,not found in BSE
+Sesa Sterlite Limited / Vedanta Limited,NYSE,BSE,Indust.Metals & Mining,VEDL,VEDL,
+Sify Technologies Limited,NASDAQ,?,Software&ComputerSvc,SIFY,?,not found in BSE
+Tata Motors,NYSE,BSE,Industrial Engineer,TTM,TATAMOTORS,
+Videocon d2h,NASDAQ,BSE,TV Services,VDTH,VIDEOIND,VIDEOIND is the group
+Wipro,NYSE,BSE,Software & Computer Svc,WIT,WIPRO,
+WNS Holdings,NYSE,?,Business Services,WNS,?,not found in BSE
