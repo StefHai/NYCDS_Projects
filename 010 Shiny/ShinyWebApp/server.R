@@ -25,12 +25,18 @@ shinyServer(function(input, output) {
     rs$remote_date = ifelse(rs$flip=="in->us", rs$in_date, rs$us_date)
     rs$local_date = as.Date(rs$local_date, origin = date.origin)
     rs$remote_date = as.Date(rs$remote_date, origin = date.origin)
-    #rs$local_date_form = format(rs$local_date, "%m/%d")
-    #rs$remote_date_form = format(rs$remote_date, "%m/%d")
     
+    rs$local_open = ifelse(rs$flip=="in->us", rs$us_open, rs$in_open)
+    rs$local_close = ifelse(rs$flip=="in->us", rs$us_close, rs$in_close)
     
+    rs$remote_open = ifelse(rs$flip=="in->us", rs$in_open, rs$us_open)
+    rs$remote_close = ifelse(rs$flip=="in->us", rs$in_close, rs$us_close)
+
     rs$local_perf = ifelse(rs$flip=="in->us", rs$us_perf, rs$in_perf)
     rs$remote_perf = ifelse(rs$flip=="in->us", rs$in_perf, rs$us_perf)
+
+    rs$avg_local = (rs$local_open + rs$local_close) / 2
+    rs$avg_remote = (rs$remote_open + rs$remote_close) / 2
     
     rs = rs %>%
       filter(rs$local_date>=as.Date(input$date.range[1]) & rs$local_date<=as.Date(input$date.range[2]))
@@ -43,19 +49,22 @@ shinyServer(function(input, output) {
       filter(remote_perf>=as.numeric(input$buying.threshold)/100)
   })
     
-  output$perf.overview.table <- renderDataTable({
+  output$perf.overview.table <- renderTable({
     rs = report.shares()
     bs = buying.shares()
 
     df = data.frame(
-      name = c("Buying", "Local", "Remote"),
-      sum = c(sum(bs$local_perf), sum(rs$local_perf), sum(rs$remote_perf)),
+      name = c("Trading", "Local", "Remote"),
+      sum = c(sum(bs$local_perf)*100, sum(rs$local_perf)*100, sum(rs$remote_perf)*100),
       count = c(length(bs$local_perf), length(rs$local_perf), length(rs$remote_perf)),
-      mean = c(mean(bs$local_perf), mean(rs$local_perf), mean(rs$remote_perf)),
-      median = c(median(bs$local_perf), median(rs$local_perf), median(rs$remote_perf)),
-      sd = c(sd(bs$local_perf), sd(rs$local_perf), sd(rs$remote_perf))
+      mean = c(mean(bs$local_perf)*100, mean(rs$local_perf)*100, mean(rs$remote_perf)*100),
+      median = c(median(bs$local_perf)*100, median(rs$local_perf)*100, median(rs$remote_perf)*100),
+      sd = c(sd(bs$local_perf)*100, sd(rs$local_perf)*100, sd(rs$remote_perf)*100),
+      pos.days = c(sum(bs$local_perf>0)*100/nrow(bs), sum(rs$local_perf>0)*100/nrow(rs), sum(rs$remote_perf>0)*100/nrow(rs)),
+      avg.win = c(mean(bs$local_perf[bs$local_perf>0])*100, mean(rs$local_perf[rs$local_perf>0])*100, mean(rs$remote_perf[rs$remote_perf>0])*100),
+      avg.lost = c(mean(bs$local_perf[bs$local_perf<=0])*100, mean(rs$local_perf[rs$local_perf<=0])*100, mean(rs$remote_perf[rs$remote_perf<=0])*100)
     )
-    colnames(df) = c("Data", "Sum", "Count", "Mean", "Median", "Std.dev")
+    colnames(df) = c("Serie", "Sum (%)", "Count", "Mean Perf. (%)", "Median Perf. (%)", "Std.dev Perf. (%)", "Pos.Days (%)", "Avg. Win pos. Days (%)", "Avg. Loss neg. Days (%)")
     
     return (df)
   })
@@ -68,15 +77,16 @@ shinyServer(function(input, output) {
     
     perf.df = data.frame(name=character(),perf=numeric())
     
-    perf.df = rbind(perf.df, rs %>% mutate(name="local perf") %>% select(name, perf=local_perf))
-    perf.df = rbind(perf.df, rs %>% mutate(name="remote perf") %>% select(name, perf=remote_perf))
-    perf.df = rbind(perf.df, bs %>% mutate(name="buying perf") %>% select(name, perf=local_perf))
+    perf.df = rbind(perf.df, rs %>% mutate(name="Local Perf.") %>% select(name, perf=local_perf))
+    perf.df = rbind(perf.df, rs %>% mutate(name="Remote Perf.") %>% select(name, perf=remote_perf))
+    perf.df = rbind(perf.df, bs %>% mutate(name="Trading Perf.") %>% select(name, perf=local_perf))
     
         
     ggplot(perf.df, aes(x=name, y=perf, fill=name)) + 
-      geom_boxplot(show.legend = T) +
-      stat_summary(fun.y=mean, colour="darkred", geom="point", 
-                   shape=18, size=3,show_guide = FALSE)
+      #geom_boxplot(show.legend = T) +
+      geom_violin(aes(fill = name), draw_quantiles = c(0.25, 0.5, 0.75), trim = F) +
+      #stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show_guide = FALSE)
+      scale_y_continuous(labels = scales::percent)    
     
   })
   
@@ -86,7 +96,7 @@ shinyServer(function(input, output) {
     # generate bins based on input$bins from ui.R
     rs = report.shares()
     
-    ggplot(rs, aes(x=local_date, y=local_perf)) + geom_line(aes(color=us_symbol))
+    ggplot(rs, aes(x=local_date, y=avg_local)) + geom_line(aes(color=us_symbol))
       
   })
   
@@ -95,7 +105,7 @@ shinyServer(function(input, output) {
     # generate bins based on input$bins from ui.R
     rs = report.shares()
     
-    ggplot(rs, aes(x=remote_date, y=remote_perf)) + geom_line(aes(color=us_symbol))
+    ggplot(rs, aes(x=remote_date, y=avg_remote)) + geom_line(aes(color=us_symbol))
     
   })
 })

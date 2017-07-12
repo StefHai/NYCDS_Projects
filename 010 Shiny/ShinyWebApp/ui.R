@@ -54,7 +54,7 @@ shinyUI(fluidPage(
     
     # Show a plot of the generated distribution
     mainPanel(
-       dataTableOutput("perf.overview.table"),
+       tableOutput("perf.overview.table"),
        plotOutput("buying.boxplot.plot"),
        plotOutput("local.perf.plot"),
        plotOutput("remote.perf.plot")
