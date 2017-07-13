@@ -14,12 +14,25 @@ library(ggplot2)
 # Define server logic required to draw a histogram
 shinyServer(function(input, output) {
   
+  server <- function(input, output, session) {
+    observe({
+      
+      # Can also set the label and select items
+      updateSelectInput(session, "days.lag",
+                        selected = 1
+      )
+    })
+  }
+  
+  
   report.shares = reactive({
+    days_lag_filter = ifelse(input$flip=="in->us", 0, 1)
+    
     rs = 
       shares %>%
       filter(flip == input$flip) %>%
       filter(us_symbol %in% input$companies) %>%
-      filter(days_lag>=input$days.lag[1] & days_lag<=input$days.lag[2])
+      filter(days_lag==days_lag_filter)
     
     rs$local_date = ifelse(rs$flip=="in->us", rs$us_date, rs$in_date)
     rs$remote_date = ifelse(rs$flip=="in->us", rs$in_date, rs$us_date)
@@ -46,7 +59,7 @@ shinyServer(function(input, output) {
   
   buying.shares = reactive({
     report.shares() %>%
-      filter(remote_perf>=as.numeric(input$buying.threshold)/100)
+      filter(remote_perf>as.numeric(input$buying.threshold)/100)
   })
     
   output$perf.overview.table <- renderTable({
@@ -64,11 +77,37 @@ shinyServer(function(input, output) {
       avg.win = c(mean(bs$local_perf[bs$local_perf>0])*100, mean(rs$local_perf[rs$local_perf>0])*100, mean(rs$remote_perf[rs$remote_perf>0])*100),
       avg.lost = c(mean(bs$local_perf[bs$local_perf<=0])*100, mean(rs$local_perf[rs$local_perf<=0])*100, mean(rs$remote_perf[rs$remote_perf<=0])*100)
     )
-    colnames(df) = c("Serie", "Sum (%)", "Count", "Mean Perf. (%)", "Median Perf. (%)", "Std.dev Perf. (%)", "Pos.Days (%)", "Avg. Win pos. Days (%)", "Avg. Loss neg. Days (%)")
+    colnames(df) = c("Serie", "Sum Perf. (%)", "Count", "Mean Perf. (%)", "Median Perf. (%)", "Std.dev Perf. (%)", "Pos.Days (%)", "Avg. Win pos. Days (%)", "Avg. Loss neg. Days (%)")
     
     return (df)
   })
+
+  output$buying.cumsum.performance.plot <- renderPlot({
+
+        bs = buying.shares()
+
+        t=
+          merge(
+            data.frame(local_date=as.Date(seq(as.Date(input$date.range[1]), as.Date(input$date.range[2]), "days"))),
+            #distinct(bs, local_date),
+            distinct(bs, us_symbol)
+          ) %>%
+          left_join(bs, by=c("local_date"="local_date", "us_symbol"="us_symbol")) %>%
+          arrange(local_date)
+        
+        t$local_perf = ifelse(is.na(t$local_perf), 0, t$local_perf)
+        
+        
+        t %>% 
+          arrange(local_date) %>%
+          group_by(us_symbol) %>% 
+          mutate(local_perf_cumsum = cumsum(local_perf)) %>%
+          ggplot(aes(x=local_date, y=local_perf_cumsum, fill=us_symbol)) + 
+          geom_area()    
+
+  })
   
+    
   output$buying.boxplot.plot <- renderPlot({
     
     # generate bins based on input$bins from ui.R
@@ -108,4 +147,26 @@ shinyServer(function(input, output) {
     ggplot(rs, aes(x=remote_date, y=avg_remote)) + geom_line(aes(color=us_symbol))
     
   })
+  
+  output$scatter.perf.plot <- renderPlot({
+    
+    # generate bins based on input$bins from ui.R
+    rs = report.shares()
+    
+    ggplot(rs, aes(x=remote_perf, y=local_perf)) + geom_point(aes(color=us_symbol))
+    
+  })
+  
+  output$perf.cor.table <- renderTable({
+    rs = report.shares()
+
+    
+    df = data.frame(
+      Pearson = cor(rs$remote_per, rs$local_perf, method="pearson"),
+      Kendall = cor(rs$remote_per, rs$local_perf, method="kendall"),
+      Spearman = cor(rs$remote_per, rs$local_perf, method="spearman")
+    )
+
+    return (df)
+  })  
 })

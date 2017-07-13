@@ -43,11 +43,8 @@ shinyUI(fluidPage(
       dateRangeInput("date.range", label = h3("Date range"), start = "2016-01-01", end = "2016-12-31"),
       
       # buying threshold
-      numericInput("buying.threshold", label = h3("Buying threshold (%)"),  min = -10, max = 10, step=0.1, value=0),
+      numericInput("buying.threshold", label = h3("Buying threshold (%)"),  min = -10, max = 10, step=0.1, value=0)
       
-      # day lag min max 
-      sliderInput("days.lag", label = h3("Day lag"), min = 0, 
-                  max = 5, value = c(0, 5))
     ),
     
  
@@ -55,9 +52,12 @@ shinyUI(fluidPage(
     # Show a plot of the generated distribution
     mainPanel(
        tableOutput("perf.overview.table"),
+       plotOutput("buying.cumsum.performance.plot"),
        plotOutput("buying.boxplot.plot"),
        plotOutput("local.perf.plot"),
-       plotOutput("remote.perf.plot")
+       plotOutput("remote.perf.plot"),
+       plotOutput("scatter.perf.plot"),
+       tableOutput("perf.cor.table")
     )
   )
 ))
