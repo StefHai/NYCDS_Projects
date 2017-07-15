@@ -18,8 +18,9 @@ shinyUI(fluidPage(
   # Sidebar with a slider input for number of bins 
   sidebarLayout(
     sidebarPanel(
-
-      
+  
+      actionButton("refreshBtn", "Refresh"),
+        
       # stock exchange selection 
       selectInput("flip", label = h3("Stock Exchange"), 
                   choices = list(
@@ -40,11 +41,23 @@ shinyUI(fluidPage(
                           ),
                           selected = "IBN"),
       # date range
-      dateRangeInput("date.range", label = h3("Date range"), start = "2016-01-01", end = "2016-12-31"),
+      dateRangeInput("date.range", label = h3("Date range"), start = "2016-01-01", end = "2017-05-14"),
       
       # buying threshold
-      numericInput("buying.threshold", label = h3("Buying threshold (%)"),  min = -10, max = 10, step=0.1, value=0)
+      numericInput("buying.threshold", label = h3("Buying threshold (%)"),  min = -10, max = 10, step=0.1, value=0),
       
+      selectInput("corLen", label = h3("Corr-window size(days):"), 
+                  choices = list("15" = 15, "30" = 30, "60" = 60, "90" = 90, "60" = 120), 
+                  selected = 60),
+
+      selectInput("corMethod", label = h3("Corr method:"), 
+            choices = list("Pearson" = "pearson", "Kendall" = "kendall", "Spearman" = "spearman"), 
+            selected = "pearson"),
+      
+      # buying threshold corr
+      numericInput("corr.threshold", label = h3("Corr threshold"),  min = -1, max = 1, step=0.05, value=-1)
+      
+
     ),
     
  
@@ -53,11 +66,14 @@ shinyUI(fluidPage(
     mainPanel(
        tableOutput("perf.overview.table"),
        plotOutput("buying.cumsum.performance.plot"),
-       plotOutput("buying.boxplot.plot"),
-       plotOutput("local.perf.plot"),
-       plotOutput("remote.perf.plot"),
-       plotOutput("scatter.perf.plot"),
-       tableOutput("perf.cor.table")
+       tableOutput("perf.cor.table"),
+       plotOutput("sliding.cor.plot"),
+       plotOutput("corr.boxplot.plot"),
+       #plotOutput("buying.boxplot.plot"),
+       plotOutput("local.perf.plot")
+       #plotOutput("remote.perf.plot"),
+       #plotOutput("scatter.perf.plot"),
+       
     )
   )
 ))
