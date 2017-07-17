@@ -258,7 +258,7 @@ merge(
   distinct(in_trading, in_date),
   distinct(in_trading, us_symbol)
 ) %>%
-  filter(us_symbol=="WIT" & in_date>as.Date("2016-10-04") & in_date<as.Date("2016-10-10") )
+  filter(us_symbol=="INFY" & in_date>as.Date("2016-10-04") & in_date<as.Date("2016-10-10") )
 
 
 
@@ -271,7 +271,7 @@ shares[flip=="us->in", cor(us_perf,in_perf), by=us_symbol]
 
 ########### working snipped running cor
 shares = as.data.table(shares)
-c = apply(shares[flip=="in->us" & us_symbol=="VEDL",,], 1, 
+c = apply(shares[flip=="in->us" & us_symbol=="INFY",,], 1, 
       function(r) {
         rflip = r["flip"]
         symbol = r["us_symbol"]
@@ -293,5 +293,107 @@ s1[flip=="in->us" & us_date>as.Date("2017-01-01", origin="1970-01-01"),,] %>%
   #geom_histogram(aes(fill=us_symbol)) + 
   #geom_vline(xintercept=mean(s1$cor_30), color="red") +
   #facet_wrap(~us_symbol)
+
+ex$pos_cor = ifelse((ex$in_perf>0 & ex$us_perf>0) | ex$in_perf<=0 & ex$us_perf<=0, 1, 0)
+
+ex$pos_trade = ifelse((ex$in_perf>0 & ex$us_perf>0), 1, ifelse(ex$in_perf>0 & ex$us_perf<0, -1, 0))
+ex$pos_trade_cumsum = cumsum(ex$pos_trade)
+ggplot(ex, aes(x=us_date, y=pos_trade_cumsum))+ geom_line()
+
+##################################################################################################################################
+################# bayes cor detector
+shares = data.table(shares)
+ex = shares[us_symbol=="TTM" &  flip=="in->us" & us_date>as.Date("2013-01-01", origin="1970-01-01") & us_date<as.Date("2018-01-01", origin="1970-01-01"),,]
+
+ex$pos_cor = ifelse(
+  (ex$in_perf>0 & ex$us_perf>0) 
+  | ex$in_perf<=0 & ex$us_perf<=0
+  , 1, 0)
+ex$pos_trade = ifelse((ex$in_perf>0 & ex$us_perf>0), 1, ifelse(ex$in_perf>0 & ex$us_perf<0, -1, 0))
+ex$pos_trade_cumsum = cumsum(ex$pos_trade)
+
+bs = 5
+ex$pos_cor_count = apply(ex, 1, function(r)
+{
+  w = ex %>% filter(us_date<as.Date(r["us_date"], origin="1970-01-01")) %>% top_n(bs, wt = us_date) 
+  return (sum(w$pos_cor))
+})  
+ex$bin_neutral = dbinom(ex$pos_cor_count, prob = 0.5, size = bs)
+ex$bin_pos = dbinom(ex$pos_cor_count, prob = 0.65, size = bs)
+ex$bin_neg = dbinom((bs-ex$pos_cor_count), prob = 0.65, size = bs)
+
+
+
+bayes = data.table(
+  pos_cor_p = 1/3,
+  neg_cor_p = 1/3,
+  neutral_cor_p = 1/3,
+  bayes_pos_cor = 1/3,
+  bayes_neg_cor = 1/3,
+  bayes_neutral_cor = 1/3
+)
+prop_threshold = 0.8
+for(i in 2:nrow(ex)) 
+{
+  p_pos = ex[i, .(bin_pos),]$bin_pos * bayes[i-1, .(bayes_pos_cor)]$bayes_pos_cor
+  p_neg = ex[i, .(bin_neg),]$bin_neg * bayes[i-1, .(bayes_neg_cor)]$bayes_neg_cor
+  p_neutral = ex[i, .(bin_neutral),]$bin_neutral * bayes[i-1, .(bayes_neutral_cor)]$bayes_neutral_cor
+  
+  bayes_pos = p_pos/(p_pos+p_neg+p_neutral)
+  bayes_neg = p_neg/(p_pos+p_neg+p_neutral)
+  bayes_neutral = p_neutral/(p_pos+p_neg+p_neutral)
+  
+  if (bayes_pos > prop_threshold){
+    bayes_pos = prop_threshold
+    bayes_neg = (1-prop_threshold)/2 # * bayes_neg / (bayes_neg + bayes_neutral)
+    bayes_neutral = (1-prop_threshold)/2 # * bayes_neutral/ (bayes_neg + bayes_neutral)
+  } 
+  else if (bayes_neg > prop_threshold){
+    bayes_neg = prop_threshold
+    bayes_pos = (1-prop_threshold)/2# * bayes_pos / (bayes_pos + bayes_neutral)
+    bayes_neutral = (1-prop_threshold)/2# * bayes_neutral / (bayes_pos + bayes_neutral)
+  } 
+  else if (bayes_neutral > prop_threshold){
+    bayes_neutral = prop_threshold
+    bayes_neg = (1-prop_threshold)/2# * bayes_neg / (bayes_pos + bayes_neg)
+    bayes_pos = (1-prop_threshold)/2# * bayes_pos / (bayes_pos + bayes_neg)
+  } 
+  
+  bayes = rbind(
+    bayes,
+    data.table(
+      pos_cor_p = p_pos,
+      neg_cor_p = p_neg,
+      neutral_cor_p = p_neutral,
+      bayes_pos_cor = bayes_pos,
+      bayes_neg_cor = bayes_neg,
+      bayes_neutral_cor = bayes_neutral
+    )
+  )
+}
+
+exb = cbind(ex, bayes)
+exb$pos_cor_dominates = ifelse(exb$bayes_pos_cor>0.7 #& exb$cor_30>=0.15
+                               #| (exb$cor_30>=0.15 & exb$bayes_pos_cor>0.3 & exb$bayes_neg_cor<0.3)
+                               , 1, 0)#!(bayes$bayes_neg_cor>bayes$bayes_pos_cor & bayes$bayes_neg_cor>bayes$bayes_neutral_cor), 1, 0) #& bayes$bayes_pos_cor>bayes$bayes_neutral_cor
+exb$trade2_buy = ifelse(
+                      exb$in_perf>0.001 & 
+                      (
+                        (exb$pos_cor_dominates==1) 
+                        #exb$bayes_pos_cor>exb$bayes_neg_cor & exb$cor_30>0.15 & exb$bayes_pos_cor>0.2
+                      ), ifelse(exb$us_perf>0, 1, -1), 0)
+
+exb$trade2_cumsum = cumsum(exb$trade2_buy*abs(exb$us_perf))
+ggplot(exb, aes(x=us_date)) + 
+  #geom_line(aes(y=pos_trade_cumsum)) + 
+  #geom_line(aes(y=pos_cor_dominates*20-10), color="red") + 
+  geom_line(aes(y=trade2_cumsum), color="blue", size=2)
+  #geom_line(aes(y=cor_30*30), color="brown", size=1)
+
+summary(exb$trade2_buy)
+sum(exb$trade2_buy)
+sum(abs(exb$trade2_buy))/2
+
+
 
 

@@ -47,7 +47,7 @@ shinyUI(fluidPage(
       numericInput("buying.threshold", label = h3("Buying threshold (%)"),  min = -10, max = 10, step=0.1, value=0),
       
       selectInput("corLen", label = h3("Corr-window size(days):"), 
-                  choices = list("15" = 15, "30" = 30, "60" = 60, "90" = 90, "60" = 120), 
+                  choices = list("15" = 15, "30" = 30, "60" = 60, "90" = 90, "120" = 120), 
                   selected = 60),
 
       selectInput("corMethod", label = h3("Corr method:"), 
@@ -64,16 +64,25 @@ shinyUI(fluidPage(
     
     # Show a plot of the generated distribution
     mainPanel(
-       tableOutput("perf.overview.table"),
-       plotOutput("buying.cumsum.performance.plot"),
-       tableOutput("perf.cor.table"),
-       plotOutput("sliding.cor.plot"),
-       plotOutput("corr.boxplot.plot"),
-       #plotOutput("buying.boxplot.plot"),
-       plotOutput("local.perf.plot")
-       #plotOutput("remote.perf.plot"),
-       #plotOutput("scatter.perf.plot"),
-       
+        
+      tabsetPanel(
+        tabPanel("Day Trading",
+          tableOutput("perf.overview.table"),
+          plotOutput("buying.cumsum.performance.plot"),
+          plotOutput("sliding.cor.plot"),
+          tableOutput("perf.cor.table"),
+          plotOutput("corr.boxplot.plot"),
+          plotOutput("buying.boxplot.plot")
+          #plotOutput("buying.boxplot.plot"),
+          #plotOutput("pos.trade.cumsum.plot"),
+        ),
+        tabPanel("Stock Prices",
+          plotOutput("us.stock.price.perf.plot"),
+          plotOutput("in.stock.price.perf.plot"),
+          plotOutput("stock.price.scatter.plot"),
+          tableOutput("stock.price.cor.table")    
+        )      
+      )
     )
   )
 ))

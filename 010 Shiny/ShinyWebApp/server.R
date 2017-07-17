@@ -53,6 +53,8 @@ shinyServer(function(input, output) {
       for (d in as.Date(input$date.range[1]):as.Date(input$date.range[2])) {
         
         corSet = rs[us_symbol==symb & local_date>=d-as.numeric(input$corLen) & local_date<d,.(local_perf, remote_perf),]
+        #corSet$local_perf = ifelse(corSet$local_perf>0, +1, -1)
+        #corSet$remote_perf = ifelse(corSet$remote_perf>0, 1, -1)
         c = cor(corSet$local_perf, corSet$remote_perf, method=input$corMethod)
         cor.df = rbind(cor.df, data.frame(us_symbol=symb, date=d, perf_cor=c))
       }
@@ -61,8 +63,12 @@ shinyServer(function(input, output) {
     
     rs = rs %>%
       left_join(cor.df, by=c("us_symbol"="us_symbol", "local_date"="date")) %>%
-      filter(rs$local_date>=as.Date(input$date.range[1]) & rs$local_date<=as.Date(input$date.range[2]))
+      filter(rs$local_date>=as.Date(input$date.range[1]) & rs$local_date<=as.Date(input$date.range[2])) %>%
+      arrange(local_date)
 
+    rs$pos_trade = ifelse((rs$remote_perf>0 & rs$local_perf>0), 1, ifelse(rs$remote_perf>0 & rs$local_perf<0, -1, 0))
+    rs$pos_trade_total_cumsum = cumsum(rs$pos_trade)
+    
     return (rs)
   })
   
@@ -72,6 +78,11 @@ shinyServer(function(input, output) {
              )
   })
     
+  
+  ##########################################################################################################
+  ##    Day Trading Tab 
+  ###
+  
   output$perf.overview.table <- renderTable({
     
     input$refreshBtn
@@ -132,77 +143,64 @@ shinyServer(function(input, output) {
           arrange(local_date) %>%
           mutate(total_perf_cumsum = cumsum(date_perf)) 
           
-        t %>% 
+        g = t %>% 
           ggplot(aes(x=local_date)) + 
           geom_area(aes(y=company_local_perf_cumsum, fill=us_symbol)) +
-          geom_smooth(data = total, aes(x=local_date, y=total_perf_cumsum), method = "loess")
-          
+          geom_smooth(data=total, aes(y=total_perf_cumsum, x=local_date), method = "loess") +
+          ggtitle("Trading Performance Running Total") +
+          scale_y_continuous(labels = scales::percent) +
+          labs(x="Time",y="Performance") +
+          theme(plot.title = element_text(color="#666666", face="bold", size=22, hjust=0)) +
+          theme(axis.title = element_text(color="#666666", face="bold", size=15))            
+        
+        return (g)          
       }
     })
   })
-  
-    
-  output$buying.boxplot.plot <- renderPlot({
-    
-    # generate bins based on input$bins from ui.R
-    rs = report.shares()
-    bs = buying.shares()
-    
-    perf.df = data.frame(name=character(),perf=numeric())
-    
-    perf.df = rbind(perf.df, rs %>% mutate(name="Local Perf.") %>% select(name, perf=local_perf))
-    perf.df = rbind(perf.df, rs %>% mutate(name="Remote Perf.") %>% select(name, perf=remote_perf))
-    perf.df = rbind(perf.df, bs %>% mutate(name="Trading Perf.") %>% select(name, perf=local_perf))
-    
-        
-    ggplot(perf.df, aes(x=name, y=perf, fill=name)) + 
-      #geom_boxplot(show.legend = T) +
-      geom_violin(aes(fill = name), draw_quantiles = c(0.25, 0.5, 0.75), trim = F) +
-      #stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show_guide = FALSE)
-      scale_y_continuous(labels = scales::percent)    
-    
-  })
-  
-  
-  output$local.perf.plot <- renderPlot({
-    
-    input$refreshBtn
-    
-    isolate({
-    
-      # generate bins based on input$bins from ui.R
-      rs = report.shares()
-      
-      ggplot(rs, aes(x=local_date, y=avg_local)) + 
-        geom_line(aes(color=us_symbol)) +
-        geom_smooth(method="loess")
-    })      
-  })
+
   
   output$sliding.cor.plot <- renderPlot({
     
     input$refreshBtn
     
     isolate({
-    
-      # generate bins based on input$bins from ui.R
       rs = report.shares()
       
-      ggplot(rs, aes(x=local_date, y=perf_cor)) + 
+      g = ggplot(rs, aes(x=local_date, y=perf_cor)) + 
         geom_line(aes(color=us_symbol)) +
-        geom_smooth(method="loess") 
+        ggtitle("Sliding Correlation Plot") +
+        scale_y_continuous(labels = scales::percent) +
+        labs(x="Time",y="Correlation") +
+        geom_hline(yintercept=0) +
+        theme(plot.title = element_text(color="#666666", face="bold", size=22, hjust=0)) +
+        theme(axis.title = element_text(color="#666666", face="bold", size=15))        
       
+      if (length(unique(rs$us_symbol))==1)
+        g = g + geom_smooth(method="loess") 
+      
+      return (g)
     })    
   })
   
-  output$scatter.perf.plot <- renderPlot({
+  
+  output$buying.boxplot.plot <- renderPlot({
     
-    # generate bins based on input$bins from ui.R
-    rs = report.shares()
+    input$refreshBtn
     
-    ggplot(rs, aes(x=remote_perf, y=local_perf)) + 
-      geom_point(aes(color=us_symbol)) 
+    isolate({
+      bs = buying.shares()
+      
+      ggplot(bs, aes(x=us_symbol)) + 
+        geom_boxplot(aes(y=local_perf, fill=us_symbol)) +
+        scale_y_continuous(labels = scales::percent) +
+        ggtitle("Trading Performance Boxplot") +
+        labs(x="Company",y="Correlation") +
+        theme(plot.title = element_text(color="#666666", face="bold", size=22, hjust=0)) +
+        theme(axis.title = element_text(color="#666666", face="bold", size=15))        
+    })    
+    
   })
+  
   
   output$corr.boxplot.plot <- renderPlot({
     
@@ -211,8 +209,26 @@ shinyServer(function(input, output) {
     isolate({
       rs = report.shares()
       
-      ggplot(rs, aes(y=perf_cor, x=us_symbol)) + 
-        geom_boxplot(aes(color=us_symbol))
+      ggplot(rs, aes(x=us_symbol)) + 
+        geom_boxplot(aes(y=perf_cor, fill=us_symbol)) +
+        scale_y_continuous(labels = scales::percent) +
+        ggtitle("Sliding Correlation Boxplot") +
+        labs(x="Company",y="Correlation") +
+        theme(plot.title = element_text(color="#666666", face="bold", size=22, hjust=0)) +
+        theme(axis.title = element_text(color="#666666", face="bold", size=15))          
+    })    
+  })  
+
+  output$pos.trade.cumsum.plot <- renderPlot({
+    
+    input$refreshBtn
+    
+    isolate({
+      rs = report.shares()
+      
+      ggplot(rs, aes(x=local_date, y=pos_trade_total_cumsum)) + 
+        geom_line(aes(color=us_symbol)) +
+        geom_smooth(method="loess")
     })    
   })  
   
@@ -249,5 +265,97 @@ shinyServer(function(input, output) {
 
       return (df)
     })
+  })
+  
+  ##########################################################################################################
+  ##    Stock Price Tab 
+  ###
+  
+  output$us.stock.price.perf.plot <- renderPlot({
+    
+    input$refreshBtn
+    
+    isolate({
+      rs = report.shares()
+      
+      ggplot(rs, aes(x=local_date, y=us_open, color=us_symbol)) + 
+        geom_line() +
+        geom_smooth(method="loess", se = F) +
+        ggtitle("US Stock Prices") +
+        labs(x="Time",y="US Stock Price") +
+        theme(plot.title = element_text(color="#666666", face="bold", size=22, hjust=0)) +
+        theme(axis.title = element_text(color="#666666", face="bold", size=15))        
+    })      
+  })
+  
+  output$in.stock.price.perf.plot <- renderPlot({
+    
+    input$refreshBtn
+    
+    isolate({
+      rs = report.shares()
+      
+      ggplot(rs, aes(x=local_date, y=in_open, color=us_symbol)) + 
+        geom_line() +
+        geom_smooth(method="loess", se = F) +
+        ggtitle("IN Stock Prices") +
+        labs(x="Time",y="IN Stock Price") +
+        theme(plot.title = element_text(color="#666666", face="bold", size=22, hjust=0)) +
+        theme(axis.title = element_text(color="#666666", face="bold", size=15))         
+    })      
+  })
+  
+  
+  output$stock.price.cor.table <- renderTable({
+    
+    input$refreshBtn
+    
+    isolate({
+      
+      rs = as.data.table(report.shares())
+      
+      
+      df = data.frame(
+        Serie = character(),#"Total",
+        Pearson = numeric(),#cor(rs$us_open, rs$in_open, method="pearson"),
+        Kendall = numeric(),#cor(rs$us_open, rs$in_open, method="kendall"),
+        Spearman = numeric()#cor(rs$us_open, rs$in_open, method="spearman")
+      )
+      
+      for(c in input$companies)
+      {
+        cc = as.character(c)
+        df = rbind(
+          df,
+          data.frame(
+            Serie = cc,
+            Pearson = cor(rs[us_symbol==cc]$us_open, rs[us_symbol==cc]$in_open, method="pearson"),
+            Kendall = cor(rs[us_symbol==cc]$us_open, rs[us_symbol==cc]$in_open, method="kendall"),
+            Spearman = cor(rs[us_symbol==cc]$us_open, rs[us_symbol==cc]$in_open, method="spearman")
+          )
+        )
+        
+      }
+      
+      return (df)
+    })
+  })
+  
+  output$stock.price.scatter.plot <- renderPlot({
+    
+    input$refreshBtn
+    
+    isolate({
+      rs = report.shares()
+      
+      ggplot(rs, aes(x=us_open, y=in_open, color=us_symbol)) + 
+        geom_point() +
+
+        ggtitle("Stock Prices Scatter Plot") +
+        labs(x="US Stock Price",y="IN Stock Price") +
+        geom_smooth(method="lm", se = F) +
+        theme(plot.title = element_text(color="#666666", face="bold", size=22, hjust=0)) +
+        theme(axis.title = element_text(color="#666666", face="bold", size=15))         
+    })      
   })  
 })
