@@ -72,7 +72,9 @@ shinyUI(fluidPage(
           plotOutput("sliding.cor.plot"),
           tableOutput("perf.cor.table"),
           plotOutput("corr.boxplot.plot"),
-          plotOutput("buying.boxplot.plot")
+          plotOutput("buying.boxplot.plot"),
+          tableOutput("trading.perf.perf.cor.table"),
+          plotOutput("cor.trade_perf.scatter.plot")
           #plotOutput("buying.boxplot.plot"),
           #plotOutput("pos.trade.cumsum.plot"),
         ),

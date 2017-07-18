@@ -12,9 +12,23 @@ library(shiny)
 library(ggplot2)
 library(data.table)
 
+
+do.trade = function(remote_perf, perf_cor, remote_perf_threshold, perf_cor_threshold)
+{
+  return(
+    remote_perf > remote_perf_threshold & 
+      perf_cor > perf_cor_threshold
+  )
+}
+
+
+
 # Define server logic required to draw a histogram
-shinyServer(function(input, output) {
+shinyServer(
+
+function(input, output) {
   
+    
   report.shares = reactive({
     
     
@@ -44,7 +58,7 @@ shinyServer(function(input, output) {
     
     rs = rs[rs$local_date>=as.Date(input$date.range[1])-as.numeric(input$corLen) & rs$local_date<=as.Date(input$date.range[2]),,]
     
-    cor.df = data.frame(us_symbol = character(), date = integer(), perf_cor = numeric() )
+    cor.df = data.frame(us_symbol = character(), date = integer(), perf_cor = numeric(), trading_perf = numeric() )
     
     for(symb in input$companies)
     {
@@ -55,8 +69,14 @@ shinyServer(function(input, output) {
         corSet = rs[us_symbol==symb & local_date>=d-as.numeric(input$corLen) & local_date<d,.(local_perf, remote_perf),]
         #corSet$local_perf = ifelse(corSet$local_perf>0, +1, -1)
         #corSet$remote_perf = ifelse(corSet$remote_perf>0, 1, -1)
+        buying = ifelse(
+                    do.trade(corSet$remote_perf, 1, as.numeric(input$buying.threshold)/100, as.numeric(input$corr.threshold)),
+                    corSet$local_perf,
+                    0
+                  )
+        trading_perf = sum(buying)
         c = cor(corSet$local_perf, corSet$remote_perf, method=input$corMethod)
-        cor.df = rbind(cor.df, data.frame(us_symbol=symb, date=d, perf_cor=c))
+        cor.df = rbind(cor.df, data.frame(us_symbol=symb, date=d, perf_cor=c, trading_perf=trading_perf))
       }
     }
     cor.df$date = as.Date(cor.df$date, origin = "1970-01-01")
@@ -66,16 +86,20 @@ shinyServer(function(input, output) {
       filter(rs$local_date>=as.Date(input$date.range[1]) & rs$local_date<=as.Date(input$date.range[2])) %>%
       arrange(local_date)
 
-    rs$pos_trade = ifelse((rs$remote_perf>0 & rs$local_perf>0), 1, ifelse(rs$remote_perf>0 & rs$local_perf<0, -1, 0))
+    rs$pos_trade = ifelse(
+                      do.trade(rs$remote_perf, rs$perf_cor, as.numeric(input$buying.threshold)/100, as.numeric(input$corr.threshold)),
+                      ifelse(rs$local_perf>0, 1, -1),
+                      0
+                    )
+
     rs$pos_trade_total_cumsum = cumsum(rs$pos_trade)
     
     return (rs)
   })
   
   buying.shares = reactive({
-    report.shares() %>%
-      filter(remote_perf>as.numeric(input$buying.threshold)/100 & perf_cor>as.numeric(input$corr.threshold) #& cor_10>0.02# & cor_30>=0.10 & cor_20 > 0.5
-             )
+    report.shares() %>% filter(pos_trade!=0)
+      #filter(do.trade(remote_perf, perf_cor, as.numeric(input$buying.threshold)/100, as.numeric(input$corr.threshold)))
   })
     
   
@@ -114,7 +138,9 @@ shinyServer(function(input, output) {
     
     isolate({
       bs = buying.shares()
-    
+      
+      
+      
       if(nrow(bs)>0)
       {
         t=
@@ -143,6 +169,8 @@ shinyServer(function(input, output) {
           arrange(local_date) %>%
           mutate(total_perf_cumsum = cumsum(date_perf)) 
           
+        max_cumsum_perf = max(abs(total$total_perf_cumsum))
+        
         g = t %>% 
           ggplot(aes(x=local_date)) + 
           geom_area(aes(y=company_local_perf_cumsum, fill=us_symbol)) +
@@ -152,6 +180,12 @@ shinyServer(function(input, output) {
           labs(x="Time",y="Performance") +
           theme(plot.title = element_text(color="#666666", face="bold", size=22, hjust=0)) +
           theme(axis.title = element_text(color="#666666", face="bold", size=15))            
+        
+        # add trading indicators
+        if (length(unique(t$us_symbol))==1 & sum(abs(t$pos_trade), na.rm=T)<200) {
+          g = g + geom_col(aes(y=pos_trade*max_cumsum_perf*0.075))
+        }
+        
         
         return (g)          
       }
@@ -168,6 +202,7 @@ shinyServer(function(input, output) {
       
       g = ggplot(rs, aes(x=local_date, y=perf_cor)) + 
         geom_line(aes(color=us_symbol)) +
+        #geom_line(aes(y=trading_perf)) +
         ggtitle("Sliding Correlation Plot") +
         scale_y_continuous(labels = scales::percent) +
         labs(x="Time",y="Correlation") +
@@ -191,6 +226,7 @@ shinyServer(function(input, output) {
       bs = buying.shares()
       
       ggplot(bs, aes(x=us_symbol)) + 
+        geom_hline(yintercept=0) +
         geom_boxplot(aes(y=local_perf, fill=us_symbol)) +
         scale_y_continuous(labels = scales::percent) +
         ggtitle("Trading Performance Boxplot") +
@@ -210,6 +246,7 @@ shinyServer(function(input, output) {
       rs = report.shares()
       
       ggplot(rs, aes(x=us_symbol)) + 
+        geom_hline(yintercept=0) +
         geom_boxplot(aes(y=perf_cor, fill=us_symbol)) +
         scale_y_continuous(labels = scales::percent) +
         ggtitle("Sliding Correlation Boxplot") +
@@ -228,7 +265,7 @@ shinyServer(function(input, output) {
       
       ggplot(rs, aes(x=local_date, y=pos_trade_total_cumsum)) + 
         geom_line(aes(color=us_symbol)) +
-        geom_smooth(method="loess")
+        geom_smooth(method="lm")
     })    
   })  
   
@@ -266,6 +303,58 @@ shinyServer(function(input, output) {
       return (df)
     })
   })
+  
+  
+  
+  output$trading.perf.perf.cor.table <- renderTable({
+    
+    input$refreshBtn
+    
+    isolate({
+      
+      rs = as.data.table(report.shares())
+      
+      
+      df = data.frame(
+        Serie = character(),
+        Pearson = numeric(),
+        Kendall = numeric(),
+        Spearman = numeric()
+      )
+      
+      for(c in input$companies)
+      {
+        cc = as.character(c)
+        df = rbind(
+          df,
+          data.frame(
+            Serie = cc,
+            Pearson = cor(rs[us_symbol==cc]$trading_perf, rs[us_symbol==c]$perf_cor, method="pearson"),
+            Kendall = cor(rs[us_symbol==cc]$trading_perf, rs[us_symbol==c]$perf_cor, method="kendall"),
+            Spearman = cor(rs[us_symbol==cc]$trading_perf, rs[us_symbol==c]$perf_cor, method="spearman")
+          )
+        )
+        
+      }
+      
+      return (df)
+    })
+  })  
+  
+  output$cor.trade_perf.scatter.plot <- renderPlot({
+    
+    input$refreshBtn
+    
+    isolate({
+      rs = report.shares()
+      if (nrow(rs)<1500) {
+        ggplot(rs, aes(x=trading_perf, y=perf_cor, color=us_symbol)) + 
+          geom_vline(xintercept=0) +
+          geom_point() +
+          geom_smooth(method="lm")
+      }
+    })    
+  })  
   
   ##########################################################################################################
   ##    Stock Price Tab 
