@@ -351,7 +351,13 @@ function(input, output) {
         ggplot(rs, aes(x=trading_perf, y=perf_cor, color=us_symbol)) + 
           geom_vline(xintercept=0) +
           geom_point() +
-          geom_smooth(method="lm")
+          geom_smooth(method="lm") +
+          scale_y_continuous(labels = scales::percent) +
+          scale_x_continuous(labels = scales::percent) +
+          ggtitle("") +
+          labs(x="Sliding Trading Performance",y="Sliding Correlation") +
+          theme(plot.title = element_text(color="#666666", face="bold", size=22, hjust=0)) +
+          theme(axis.title = element_text(color="#666666", face="bold", size=15))         
       }
     })    
   })  

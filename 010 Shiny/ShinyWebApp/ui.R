@@ -70,9 +70,11 @@ shinyUI(fluidPage(
           tableOutput("perf.overview.table"),
           plotOutput("buying.cumsum.performance.plot"),
           plotOutput("sliding.cor.plot"),
+          h4("Total Correlation: local performance / remote performance"),
           tableOutput("perf.cor.table"),
           plotOutput("corr.boxplot.plot"),
           plotOutput("buying.boxplot.plot"),
+          h4("Correlation between Sliding Trading Perf. and Sliding Perf. Correlation"),
           tableOutput("trading.perf.perf.cor.table"),
           plotOutput("cor.trade_perf.scatter.plot")
           #plotOutput("buying.boxplot.plot"),
