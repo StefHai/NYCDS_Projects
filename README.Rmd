@@ -1,0 +1,19 @@
+---
+title: "README"
+author: "Stefan Hainzer"
+date: "18 Juli 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is the project folder for all NYC Data Science Academy projects.
+
+## Shiny Project
+
+Shiny project to visualise and analyse the similarity of the day performances of multiple listed companies (companies which are listed at more than one stock exchange).
+You find a pdf-file with slides within the folder.
+
+
