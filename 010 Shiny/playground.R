@@ -116,8 +116,8 @@ ex$pos_cor_count = apply(ex, 1, function(r)
   return (sum(w$pos_cor))
 })  
 ex$bin_neutral = dbinom(ex$pos_cor_count, prob = 0.5, size = bs)
-ex$bin_pos = dbinom(ex$pos_cor_count, prob = 0.65, size = bs)
-ex$bin_neg = dbinom((bs-ex$pos_cor_count), prob = 0.65, size = bs)
+ex$bin_pos = dbinom(ex$pos_cor_count, prob = 0.53, size = bs)
+ex$bin_neg = dbinom((bs-ex$pos_cor_count), prob = 0.53, size = bs)
 
 
 
@@ -129,7 +129,7 @@ bayes = data.table(
   bayes_neg_cor = 1/3,
   bayes_neutral_cor = 1/3
 )
-prop_threshold = 0.8
+prop_threshold = 0.7
 for(i in 2:nrow(ex)) 
 {
   p_pos = ex[i, .(bin_pos),]$bin_pos * bayes[i-1, .(bayes_pos_cor)]$bayes_pos_cor
@@ -173,6 +173,15 @@ exb = cbind(ex, bayes)
 exb$pos_cor_dominates = ifelse(exb$bayes_pos_cor>0.7 #& exb$cor_30>=0.15
                                #| (exb$cor_30>=0.15 & exb$bayes_pos_cor>0.3 & exb$bayes_neg_cor<0.3)
                                , 1, 0)#!(bayes$bayes_neg_cor>bayes$bayes_pos_cor & bayes$bayes_neg_cor>bayes$bayes_neutral_cor), 1, 0) #& bayes$bayes_pos_cor>bayes$bayes_neutral_cor
+exb$date2 = exb$us_date-7
+
+exb %>% 
+  filter(us_date>=as.Date("2016-01-01", origin="1970-01-01") & us_date>=as.Date("2017-01-01", origin="1970-01-01") ) %>% 
+  ggplot() + 
+  geom_line(aes(x=date2, y=cor_30), color="red") + 
+  geom_line(aes(x=us_date, y=(bayes_pos_cor-0.5)*0.5))
+
+
 exb$trade2_buy = ifelse(
   exb$in_perf>0.001 & 
     (
@@ -190,4 +199,5 @@ ggplot(exb, aes(x=us_date)) +
 summary(exb$trade2_buy)
 sum(exb$trade2_buy)
 sum(abs(exb$trade2_buy))/2
+
 
