@@ -1,0 +1,10 @@
+name: ShinyWebApp
+title: ShinyWebApp
+account: stefhai
+server: shinyapps.io
+appId: 197985
+bundleId: 908416
+url: https://stefhai.shinyapps.io/ShinyWebApp/
+when: 1500437484.12799
+asMultiple: FALSE
+asStatic: FALSE

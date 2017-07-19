@@ -15,5 +15,6 @@ This is the project folder for all NYC Data Science Academy projects.
 
 Shiny project to visualise and analyse the similarity of the day performances of multiple listed companies (companies which are listed at more than one stock exchange).
 You find a pdf-file with slides within the folder.
+Link to webapp: https://stefhai.shinyapps.io/ShinyWebApp/
 
 
