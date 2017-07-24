@@ -200,4 +200,4 @@ summary(exb$trade2_buy)
 sum(exb$trade2_buy)
 sum(abs(exb$trade2_buy))/2
 
-
+tst = read.csv("double_listed_shares.csv", stringsAsFactors = F)
