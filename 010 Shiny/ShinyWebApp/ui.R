@@ -41,7 +41,7 @@ shinyUI(fluidPage(
                           ),
                           selected = "IBN"),
       # date range
-      dateRangeInput("date.range", label = h3("Date range"), start = "2015-01-01", end = "2017-05-14"),
+      dateRangeInput("date.range", label = h3("Date range"), start = "2015-01-01", end = "2017-07-01"),
       
       # buying threshold
       numericInput("buying.threshold", label = h3("Buying threshold (%)"),  min = -10, max = 10, step=0.1, value=0),

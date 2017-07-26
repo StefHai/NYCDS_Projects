@@ -182,7 +182,7 @@ function(input, output) {
           theme(axis.title = element_text(color="#666666", face="bold", size=15))            
         
         # add trading indicators
-        if (length(unique(t$us_symbol))==1 & sum(abs(t$pos_trade), na.rm=T)<200) {
+        if (length(unique(t$us_symbol))==1 & sum(abs(t$pos_trade), na.rm=T)<300) {
           g = g + geom_col(aes(y=pos_trade*max_cumsum_perf*0.075))
         }
         
@@ -200,18 +200,23 @@ function(input, output) {
     isolate({
       rs = report.shares()
       
-      g = ggplot(rs, aes(x=local_date, y=perf_cor)) + 
-        geom_line(aes(color=us_symbol)) +
-        #geom_line(aes(y=trading_perf)) +
-        ggtitle("Sliding Correlation Plot") +
+      g = ggplot(rs, aes(x=local_date)) + 
+        geom_line(aes(color=us_symbol, y=perf_cor)) +
         scale_y_continuous(labels = scales::percent) +
         labs(x="Time",y="Correlation") +
         geom_hline(yintercept=0) +
         theme(plot.title = element_text(color="#666666", face="bold", size=22, hjust=0)) +
         theme(axis.title = element_text(color="#666666", face="bold", size=15))        
       
-      if (length(unique(rs$us_symbol))==1)
-        g = g + geom_smooth(method="loess") 
+      if (length(unique(rs$us_symbol))==1) {
+        g = g +
+          #+ geom_line(aes(color=us_symbol, y=trading_perf), color="black", linetype="longdash")
+          geom_smooth(method="loess", aes(y=perf_cor)) +
+          #+ ggtitle("Sliding Correlation/Trading Performance Plot")
+          ggtitle("Sliding Correlation Plot")
+      }
+      else 
+        g = g + ggtitle("Sliding Correlation Plot") 
       
       return (g)
     })    
