@@ -10,6 +10,25 @@ def webDriverWait(browser, xpath, timeout):
         wait = WebDriverWait(browser, timeout)
         return wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
 
+def findElementByXPath (browser, xpath):
+    try:
+        return browser.find_element_by_xpath(xpath)
+    except Exception as ex:
+        return None
+
+def findElementsByXPath (browser, xpath):
+    try:
+        return browser.find_elements_by_xpath(xpath)
+    except Exception as ex:
+        return None
+
+def findElementByXPath_text(browser, xpath):
+    e = findElementByXPath(browser, xpath)
+    if e is None:
+        return None
+    else:
+        return e.text
+
 def getListOfBooks(browser, url):
     bestSellerLinksLst = []
 
@@ -47,21 +66,45 @@ def getBookProperties(browser, url):
     browser.get(url)
     
     # wait till site loaded, respectively the product image
-    webDriverWait(browser, '//div[@class="adbl-rating-cont adbl-new-stars "]', 20)
+    webDriverWait(browser, '//div[@class="adbl-reviews"]', 20)
 
-    breadcrumb = browser.find_element_by_xpath('//div[@class="adbl-pd-breadcrumb"]')
-    breadcrumb_items = breadcrumb.find_elements_by_xpath('.//span[@itemprop="name"]')
+    amazonReviewsLink = findElementByXPath(browser, '//li[@data-paging-type="AmazonReviews"]')
+    if not amazonReviewsLink is None:
+         amazonReviewsLink.click()
+
+    breadcrumb = findElementByXPath(browser, '//div[@class="adbl-pd-breadcrumb"]')
+    breadcrumb_items = findElementsByXPath(breadcrumb, './/span[@itemprop="name"]')
     result['breadcrumbs'] = list(map(lambda i: i.text, breadcrumb_items))
-    result['title'] = browser.find_element_by_xpath('//h1[@class="adbl-prod-h1-title"]').text
-    result['authors'] = browser.find_element_by_xpath('//span[@class="adbl-prod-author"]').text
-    result['narrated_by'] = browser.find_element_by_xpath('//li[@class="adbl-narrator-row"]/span[2]').text
-    result['length'] = browser.find_element_by_xpath('//span[@class="adbl-run-time"]').text
-    result['release_date'] = browser.find_element_by_xpath('//span[@class="adbl-date adbl-release-date"]').text
-    result['publisher'] = browser.find_element_by_xpath('//span[@class="adbl-publisher"]').text
-    #result[''] = browser.find_element_by_xpath('').text
-    #result[''] = browser.find_element_by_xpath('').text
-    #result[''] = browser.find_element_by_xpath('').text
+    result['title'] = findElementByXPath_text(browser, '//h1[@class="adbl-prod-h1-title"]')
+    result['authors'] = findElementByXPath_text(browser, '//span[@class="adbl-prod-author"]')
+    result['narrated_by'] = findElementByXPath_text(browser, '//li[@class="adbl-narrator-row"]/span[2]')
+    result['length'] = findElementByXPath_text(browser, '//span[@class="adbl-run-time"]')
+    result['release_date'] = findElementByXPath_text(browser, '//span[@class="adbl-date adbl-release-date"]')
+    result['publisher'] = findElementByXPath_text(browser, '//span[@class="adbl-publisher"]')
+    result['series'] = findElementByXPath_text(browser, '//div[@class="adbl-series-link"]')
+    result['program_format'] = findElementByXPath_text(browser, '//span[@class="adbl-format-type"]')
+    result['price'] = findElementByXPath_text(browser, '//button[@id="addWithoutMemButton"]//div[@class="adbl-price"]')
     
+    result['adbl.rating.overall.value'] = findElementByXPath_text(browser, "//span[@class='adbl-product-rating-star-text-wrap boldrating']")
+    result['adbl.rating.overall.count'] = findElementByXPath_text(browser, '//span[@class="adbl-product-rating-star-text-wrap"]')
+    
+    result['adbl.rating.story.value'] = findElementByXPath_text(browser, '//span[@class="adbl-product-rating-star-text-wrap boldrating"]')
+    result['adbl.rating.story.count'] = findElementByXPath_text(browser, '//span[@class="adbl-product-rating-star-text-wrap"]')
+    
+    result['adbl.rating.performance.value'] = findElementByXPath_text(browser, '//span[@class="adbl-product-rating-star-text-wrap boldrating"]')
+    result['adbl.rating.performance.count'] = findElementByXPath_text(browser, '//span[@class="adbl-product-rating-star-text-wrap"]')
+
+    browser.switch_to.frame("adbl-amzn-reviews")
+
+    imgElement = findElementByXPath(browser, '/html/body/div[2]/div[2]/div[1]/div[3]/span/span/a/img')
+    if not imgElement is None:
+        result['amazon.rating.overall.value'] = imgElement.get_attribute("alt")
+    else:
+        result['amazon.rating.overall.value'] = None
+    result['amazon.rating.overall.count'] = findElementByXPath_text(browser, '//body/div[2]/div[2]/div/div[3]')
+    #result[''] = findElementByXPath_text(browser, '')
+    #result[''] = findElementByXPath_text(browser, '')
+
 
     return result
 
@@ -71,16 +114,25 @@ def getBookProperties(browser, url):
 
 
 browser = webdriver.Chrome()
+browser.delete_all_cookies()
 try:
     try:
-        #url = "http://www.audible.com/adblbestsellers"
-        #bstSellerLst = getListOfBooks(browser, url)
+        
+        url = "http://www.audible.com/adblbestsellers"
+        bstSellerLst = getListOfBooks(browser, url)
         #print(bstSellerLst)
 
-        url = "http://www.audible.com/pd/Science-Technology/Homo-Deus-Audiobook/B01N4DCBK6/ref=a_adblbests_c2_20_t?ie=UTF8&pf_rd_r=1HFKPMMX8A65VF1739Z6&pf_rd_m=A2ZO8JX97D5MN9&pf_rd_t=101&pf_rd_i=adblbestsellers&pf_rd_p=1815570102&pf_rd_s=center-2"
-        print(getBookProperties(browser, url))        
+        for b in bstSellerLst:
+            print(b)
+            browser.delete_all_cookies()
+            print(getBookProperties(browser, b))   
+        
+        #url = "https://www.audible.com/pd/Sci-Fi-Fantasy/A-Clash-of-Kings-Audiobook/B002UZKIBO?ref_=a_adblbests_c2_16_t"
+        #print(getBookProperties(browser, url))        
     except Exception as e:
+        print(type(e))
         print(e)
+        print(e.__context__)
 
 finally:
     browser.close()
