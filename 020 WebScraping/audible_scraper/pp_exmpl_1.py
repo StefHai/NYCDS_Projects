@@ -1,26 +1,31 @@
+import selenium.webdriver
+import selenium.webdriver.support
+import selenium.webdriver.support.expected_conditions
+import selenium.webdriver.common.by
 
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-import time
-import csv
-import numpy as np
+import math, sys, time
+import pp
+
+def testDriver(url):
+    browser = selenium.webdriver.Chrome()
+    browser.delete_all_cookies()
+    bookDic = getBookProperties(browser, url)
+    return bookDic
 
 def webDriverWait(browser, xpath, timeout):
-        wait = WebDriverWait(browser, timeout)
-        return wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
+        wait = selenium.webdriver.support.ui.WebDriverWait(browser, timeout)
+        return wait.until(selenium.webdriver.support.expected_conditions.element_to_be_clickable((selenium.webdriver.common.by.By.XPATH, xpath)))
 
 def findElementByXPath (browser, xpath):
     try:
         return browser.find_element_by_xpath(xpath)
-    except EC.NoSuchElementException as ex:
+    except selenium.webdriver.support.expected_conditions.NoSuchElementException as ex:
         return None
 
 def findElementsByXPath (browser, xpath):
     try:
         return browser.find_elements_by_xpath(xpath)
-    except EC.NoSuchElementException as ex:
+    except selenium.webdriver.support.expected_conditions.NoSuchElementException as ex:
         return None
 
 def findElementByXPath_text(browser, xpath):
@@ -29,38 +34,6 @@ def findElementByXPath_text(browser, xpath):
         return None
     else:
         return e.text
-
-def getListOfBooks(browser, url):
-    bestSellerLinksLst = []
-
-    browser.get(url)
-
-    isLastSite = False
-    while not isLastSite:
-        # wait till site loaded, respectively the last list element
-        webDriverWait(browser, '//li[@class="adbl-result-item adbl-last"]', 20)
-
-        # get list of best sellers
-        bestSellerLst = browser.find_elements_by_xpath('//div[@class="adbl-results-content"]/li')
-
-        # get best seller links
-        for i, best_seller in enumerate(bestSellerLst):
-            prodTitle = best_seller.find_element_by_xpath('.//div[@class="adbl-prod-title"]')
-            link = prodTitle.find_element_by_xpath('.//a[@class="adbl-link"]').get_attribute("href")
-            bestSellerLinksLst += [link]
-        
-        nextSiteButton = browser.find_element_by_xpath('//span[@class="adbl-page-next"]')
-        
-        try:
-            e = nextSiteButton.find_element_by_xpath('.//span[@class="adbl-link-off"]')
-            isLastSite = True
-        except Exception as e:
-            isLastSite = False
-        
-        if not isLastSite:
-            nextSiteButton.click()
-    
-    return bestSellerLinksLst
 
 def getBookProperties(browser, url):
     result = {}
@@ -103,9 +76,6 @@ def getBookProperties(browser, url):
     else:
         result['amazon.rating.overall.value'] = None
     result['amazon.rating.overall.count'] = findElementByXPath_text(browser, '//body/div[2]/div[2]/div/div[3]')
-    #result[''] = findElementByXPath_text(browser, '')
-    #result[''] = findElementByXPath_text(browser, '')
-
 
     return result
 
@@ -113,45 +83,41 @@ def getBookProperties(browser, url):
 
 
 
+# tuple of all parallel python servers to connect with
+ppservers = ()
+#ppservers = ("10.0.0.1",)
 
-browser = webdriver.Chrome()
-browser.delete_all_cookies()
-try:
-    try:
-        
-        url = "http://www.audible.com/adblbestsellers"
-        bstSellerLst = getListOfBooks(browser, url)
-        #print(bstSellerLst)
+if len(sys.argv) > 1:
+    ncpus = int(sys.argv[1])
+    # Creates jobserver with ncpus workers
+    job_server = pp.Server(ncpus, ppservers=ppservers)
+else:
+    # Creates jobserver with automatically detected number of workers
+    job_server = pp.Server(ppservers=ppservers)
 
-        adblBestSellerBooks = []
+print("Starting pp with", job_server.get_ncpus(), "workers")
 
-        for b in bstSellerLst:
-            print(b)
-            browser.delete_all_cookies()
-            bestSellerBook = getBookProperties(browser, b)
-            adblBestSellerBooks += [bestSellerBook]
-        
-        np.save("bestsellers_2017-07-29.dat", adblBestSellerBooks)
-        #url = "https://www.audible.com/pd/Sci-Fi-Fantasy/A-Clash-of-Kings-Audiobook/B002UZKIBO?ref_=a_adblbests_c2_16_t"
-        #print(getBookProperties(browser, url))        
-    except Exception as e:
-        print(type(e))
-        print(e)
-        print(e.stacktrace)
+start_time = time.time()
 
-finally:
-    browser.close()
+#print(testDriver("https://www.audible.com/pd/Sci-Fi-Fantasy/A-Clash-of-Kings-Audiobook/B002UZKIBO?ref_=a_adblbests_c2_16_t"))
 
-print("Done.")
 
-'''
-import numpy as np
 
-# Save
-dictionary = {'hello':'world'}
-np.save('my_file.npy', dictionary) 
+# The following submits 8 jobs and then retrieves the results
+inputs = ("https://www.audible.com/pd/Sci-Fi-Fantasy/A-Clash-of-Kings-Audiobook/B002UZKIBO?ref_=a_adblbests_c2_16_t",\
+"https://www.audible.com/pd/Sci-Fi-Fantasy/A-Knight-of-the-Seven-Kingdoms-Audiobook/B011PVYB2A/ref=a_pd_Sci-Fi_c4_1_1_i?ie=UTF8&pf_rd_r=QS1M7K6CZF5RK1FWMMWN&pf_rd_m=A2ZO8JX97D5MN9&pf_rd_t=101&pf_rd_i=detail-page&pf_rd_p=3004414202&pf_rd_s=center-4",\
+"https://www.audible.com/pd/Sci-Fi-Fantasy/Rogues-Audiobook/B00L1GU3WC/ref=a_pd_Sci-Fi_c4_1_4_i?ie=UTF8&pf_rd_r=S3N7A229DN4AGVQ9A0VA&pf_rd_m=A2ZO8JX97D5MN9&pf_rd_t=101&pf_rd_i=detail-page&pf_rd_p=3004414202&pf_rd_s=center-4")
 
-# Load
-read_dictionary = np.load('my_file.npy').item()
-print(read_dictionary['hello']) # displays "world"
-'''
+helperFunctions = (webDriverWait, findElementByXPath, findElementsByXPath, findElementByXPath_text, getBookProperties,)
+modulList = ("selenium.webdriver", "selenium.webdriver.support", "selenium.webdriver.support.expected_conditions", "selenium.webdriver.common.by",)
+jobs = [(input, job_server.submit(testDriver,(input,), helperFunctions, modulList)) for input in inputs]
+
+for input, job in jobs:
+    print("Sum of primes below", input, "is", job())
+
+print("Time elapsed: ", time.time() - start_time, "s")
+job_server.print_stats()
+
+
+
+# Parallel Python Software: http://www.parallelpython.com
