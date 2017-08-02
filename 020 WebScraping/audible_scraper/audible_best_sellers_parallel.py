@@ -40,11 +40,11 @@ end_time = time.time()
 print("seconds elapsed: " + str(end_time - start_time))
 
 print(len(adblBestSellerBooks))
-np.save("bestsellers_2017-08-01", adblBestSellerBooks)
+np.save("bestsellers_2017-08-02", adblBestSellerBooks)
 #print(adblBestSellerBooks)
 
 ###########################################################################
-# tidy up
+# clean up
 
 quitDefaultDriver()
 

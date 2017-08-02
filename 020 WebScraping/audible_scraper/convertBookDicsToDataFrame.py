@@ -62,7 +62,7 @@ def convertBookDicsListToDataFrame(bookDics):
     
     return bs_df
 
-filenName = "bestsellers_2017-08-01"
+filenName = "bestsellers_2017-08-02"
 bookDics = np.load(filenName + '.npy')
 df = convertBookDicsListToDataFrame(bookDics)
 print(df)
